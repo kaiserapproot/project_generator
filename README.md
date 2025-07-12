@@ -52,6 +52,12 @@ create_vcxproj.bat -src MyProject utils.c network.c
 create_vcxproj.bat -src -objc MyObjCProject
 ```
 
+#### リポジトリ内蔵のGNUStepを使用（推奨）
+```bat
+create_vcxproj.bat -src -objc -path "./gnustep" MyObjCProject
+```
+このリポジトリには事前設定済みのGNUStep環境（./gnustepディレクトリ）が含まれているため、追加のインストール作業なしでObjective-Cプロジェクトを作成できます。
+
 #### カスタムGNUStepパスでObjective-Cプロジェクト
 ```bat
 create_vcxproj.bat -src -objc -path "C:\GNUstep" MyObjCProject
@@ -84,6 +90,7 @@ create_vcxproj.bat -clean MyProject
 - **ランタイム**: GNUStep 2.0
 - **対応拡張子**: .m（Objective-C）
 - **自動設定**: GNUStepライブラリリンク、DLLコピー、コンパイラオプション
+- **組み込み環境**: このリポジトリには事前設定済みのGNUStep環境（./gnustepディレクトリ）が含まれており、追加のインストールなしでObjective-C開発が可能
 
 ---
 
