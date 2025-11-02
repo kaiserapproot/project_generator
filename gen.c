@@ -476,6 +476,23 @@ static char *replace_all(const char *str, const char *from, const char *to) {
     return out;
 }
 
+/* UUID を生成する（シンプルな実装） */
+static void generate_uuid(char *uuid_str) {
+    static unsigned int seed = 1;
+    unsigned int t = (unsigned int)time(NULL) ^ (seed++);
+    unsigned int r1 = t * 1103515245 + 12345;
+    unsigned int r2 = r1 * 1103515245 + 12345;
+    unsigned int r3 = r2 * 1103515245 + 12345;
+    unsigned int r4 = r3 * 1103515245 + 12345;
+    snprintf(uuid_str, 40, "{%08X-%04X-%04X-%04X-%08X%04X}",
+             r1 & 0xFFFFFFFF,
+             r2 & 0xFFFF,
+             r3 & 0xFFFF,
+             r4 & 0xFFFF,
+             (r1 ^ r2) & 0xFFFFFFFF,
+             (r3 ^ r4) & 0xFFFF);
+}
+
 /* '# Begin Group "Source Files"' の後、最初の '# End Group' の直前に SOURCE 行を挿入する */
 static char *insert_main_into_dsp(const char *content, const char *projname) {
     const char *group_marker = "# Begin Group \"Source Files\"";
@@ -594,6 +611,497 @@ static int generate_info_plist_macos(const char *projname, const char *outdir) {
     
     int result = write_file(path, plist_replaced, strlen(plist_replaced));
     free(plist_replaced);
+    return result;
+}
+
+/* Windows Objective-C 用 main.m を生成 */
+static int generate_winobjc_main_m(const char *projname, const char *outdir) {
+    const char *main_mm_content =
+        "#include <Foundation/Foundation.h>\r\n"
+        "#define WIN32_LEAN_AND_MEAN\r\n"
+        "#include <windows.h>\r\n"
+        "\r\n"
+        "// --- AppDelegate ---\r\n"
+        "@interface AppDelegate : NSObject\r\n"
+        "@property (nonatomic, assign) HINSTANCE hInstance;\r\n"
+        "@property (nonatomic, assign) int nCmdShow;\r\n"
+        "- (void)applicationWillFinishLaunching;\r\n"
+        "- (void)applicationDidFinishLaunching;\r\n"
+        "- (void)applicationDidBecomeActive;\r\n"
+        "- (void)applicationWillResignActive;\r\n"
+        "- (void)applicationWillTerminate;\r\n"
+        "@end\r\n"
+        "\r\n"
+        "@implementation AppDelegate\r\n"
+        "- (void)applicationWillFinishLaunching {\r\n"
+        "    NSLog(@\"[AppDelegate] application startup preparing\");\r\n"
+        "}\r\n"
+        "- (void)applicationDidFinishLaunching {\r\n"
+        "    NSLog(@\"[AppDelegate] application startup completed\");\r\n"
+        "}\r\n"
+        "- (void)applicationDidBecomeActive {\r\n"
+        "    NSLog(@\"[AppDelegate] application became active\");\r\n"
+        "}\r\n"
+        "- (void)applicationWillResignActive {\r\n"
+        "    NSLog(@\"[AppDelegate] application became inactive\");\r\n"
+        "}\r\n"
+        "- (void)applicationWillTerminate {\r\n"
+        "    NSLog(@\"[AppDelegate] application will terminate\");\r\n"
+        "}\r\n"
+        "@end\r\n"
+        "\r\n"
+        "// --- MyView ---\r\n"
+        "@interface MyView : NSObject\r\n"
+        "@property (nonatomic, assign) HWND hWnd;\r\n"
+        "- (void)drawRect;\r\n"
+        "- (void)handleMouseDownAt:(POINT)pt;\r\n"
+        "@end\r\n"
+        "\r\n"
+        "@implementation MyView\r\n"
+        "- (void)drawRect {\r\n"
+        "    PAINTSTRUCT ps;\r\n"
+        "    HDC hdc = BeginPaint(self.hWnd, &ps);\r\n"
+        "    TextOutW(hdc, 20, 20, L\"Hello Objective-C!\", 18);\r\n"
+        "    EndPaint(self.hWnd, &ps);\r\n"
+        "}\r\n"
+        "- (void)handleMouseDownAt:(POINT)pt {\r\n"
+        "    NSLog(@\"[MyView] mouse clicked at x=%ld, y=%ld\", pt.x, pt.y);\r\n"
+        "}\r\n"
+        "@end\r\n"
+        "\r\n"
+        "// --- MyViewController ---\r\n"
+        "@interface MyViewController : NSObject\r\n"
+        "@property (nonatomic, strong) MyView *view;\r\n"
+        "- (void)loadViewWithParent:(HWND)parent;\r\n"
+        "- (void)handleMouseDownAt:(POINT)pt;\r\n"
+        "@end\r\n"
+        "\r\n"
+        "@implementation MyViewController\r\n"
+        "- (void)loadViewWithParent:(HWND)parent {\r\n"
+        "    self.view = [[MyView alloc] init];\r\n"
+        "    self.view.hWnd = parent;\r\n"
+        "    NSLog(@\"[MyViewController] view attached to parent window\");\r\n"
+        "}\r\n"
+        "- (void)handleMouseDownAt:(POINT)pt {\r\n"
+        "    if (self.view) {\r\n"
+        "        [self.view handleMouseDownAt:pt];\r\n"
+        "    }\r\n"
+        "}\r\n"
+        "@end\r\n"
+        "\r\n"
+        "// --- Global Variables ---\r\n"
+        "HINSTANCE hInst;\r\n"
+        "WCHAR szWindowClass[] = L\"ObjCWin32WindowClass\";\r\n"
+        "AppDelegate *appDelegate;\r\n"
+        "MyViewController *viewController;\r\n"
+        "\r\n"
+        "// --- Function Prototypes ---\r\n"
+        "ATOM MyRegisterClass(HINSTANCE hInstance);\r\n"
+        "BOOL InitInstance(HINSTANCE, int);\r\n"
+        "LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);\r\n"
+        "\r\n"
+        "// --- WinMain ---\r\n"
+        "int APIENTRY wWinMain(\r\n"
+        "    _In_ HINSTANCE hInstance,\r\n"
+        "    _In_opt_ HINSTANCE hPrevInstance,\r\n"
+        "    _In_ LPWSTR lpCmdLine,\r\n"
+        "    _In_ int nCmdShow)\r\n"
+        "{\r\n"
+        "    UNREFERENCED_PARAMETER(hPrevInstance);\r\n"
+        "    UNREFERENCED_PARAMETER(lpCmdLine);\r\n"
+        "\r\n"
+        "    appDelegate = [[AppDelegate alloc] init];\r\n"
+        "    appDelegate.hInstance = hInstance;\r\n"
+        "    appDelegate.nCmdShow = nCmdShow;\r\n"
+        "    [appDelegate applicationWillFinishLaunching];\r\n"
+        "    [appDelegate applicationDidFinishLaunching];\r\n"
+        "\r\n"
+        "    MyRegisterClass(hInstance);\r\n"
+        "\r\n"
+        "    if (!InitInstance(hInstance, nCmdShow))\r\n"
+        "    {\r\n"
+        "        return FALSE;\r\n"
+        "    }\r\n"
+        "\r\n"
+        "    [appDelegate applicationDidBecomeActive];\r\n"
+        "\r\n"
+        "    MSG msg;\r\n"
+        "    BOOL isActive = TRUE;\r\n"
+        "    while (GetMessage(&msg, 0, 0, 0))\r\n"
+        "    {\r\n"
+        "        if (msg.message == WM_ACTIVATEAPP) {\r\n"
+        "            if (msg.wParam && !isActive) {\r\n"
+        "                [appDelegate applicationDidBecomeActive];\r\n"
+        "                isActive = TRUE;\r\n"
+        "            } else if (!msg.wParam && isActive) {\r\n"
+        "                [appDelegate applicationWillResignActive];\r\n"
+        "                isActive = FALSE;\r\n"
+        "            }\r\n"
+        "        }\r\n"
+        "        TranslateMessage(&msg);\r\n"
+        "        DispatchMessage(&msg);\r\n"
+        "    }\r\n"
+        "    [appDelegate applicationWillTerminate];\r\n"
+        "    return (int) msg.wParam;\r\n"
+        "}\r\n"
+        "\r\n"
+        "// --- Register Window Class ---\r\n"
+        "ATOM MyRegisterClass(HINSTANCE hInstance)\r\n"
+        "{\r\n"
+        "    WNDCLASSEXW wcex;\r\n"
+        "    wcex.cbSize = sizeof(WNDCLASSEX);\r\n"
+        "    wcex.style = CS_HREDRAW | CS_VREDRAW;\r\n"
+        "    wcex.lpfnWndProc = WndProc;\r\n"
+        "    wcex.cbClsExtra = 0;\r\n"
+        "    wcex.cbWndExtra = 0;\r\n"
+        "    wcex.hInstance = hInstance;\r\n"
+        "    wcex.hIcon = LoadIcon(0, IDI_APPLICATION);\r\n"
+        "    wcex.hCursor = LoadCursor(0, IDC_ARROW);\r\n"
+        "    wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);\r\n"
+        "    wcex.lpszMenuName = 0;\r\n"
+        "    wcex.lpszClassName = szWindowClass;\r\n"
+        "    wcex.hIconSm = LoadIcon(0, IDI_APPLICATION);\r\n"
+        "    return RegisterClassExW(&wcex);\r\n"
+        "}\r\n"
+        "\r\n"
+        "// --- Initialize Instance ---\r\n"
+        "BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)\r\n"
+        "{\r\n"
+        "    hInst = hInstance;\r\n"
+        "    LPCWSTR windowTitle = L\"PROJNAME\";\r\n"
+        "    HWND hWnd = CreateWindowW(\r\n"
+        "        szWindowClass,\r\n"
+        "        windowTitle,\r\n"
+        "        WS_OVERLAPPEDWINDOW,\r\n"
+        "        CW_USEDEFAULT, 0, CW_USEDEFAULT, 0,\r\n"
+        "        0, 0, hInstance, 0);\r\n"
+        "    if (!hWnd) return FALSE;\r\n"
+        "    ShowWindow(hWnd, nCmdShow);\r\n"
+        "    UpdateWindow(hWnd);\r\n"
+        "    viewController = [[MyViewController alloc] init];\r\n"
+        "    [viewController loadViewWithParent:hWnd];\r\n"
+        "    return TRUE;\r\n"
+        "}\r\n"
+        "\r\n"
+        "// --- Window Procedure ---\r\n"
+        "LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)\r\n"
+        "{\r\n"
+        "    switch (message)\r\n"
+        "    {\r\n"
+        "    case WM_PAINT:\r\n"
+        "        if (viewController && viewController.view) {\r\n"
+        "            [viewController.view drawRect];\r\n"
+        "        }\r\n"
+        "        break;\r\n"
+        "    case WM_LBUTTONDOWN: {\r\n"
+        "        if (viewController) {\r\n"
+        "            POINT pt = { LOWORD(lParam), HIWORD(lParam) };\r\n"
+        "            [viewController handleMouseDownAt:pt];\r\n"
+        "        }\r\n"
+        "        break;\r\n"
+        "    }\r\n"
+        "    case WM_DESTROY:\r\n"
+        "        PostQuitMessage(0);\r\n"
+        "        break;\r\n"
+        "    default:\r\n"
+        "        return DefWindowProc(hWnd, message, wParam, lParam);\r\n"
+        "    }\r\n"
+        "    return 0;\r\n"
+        "}\r\n";
+    
+    char path[1024];
+    char *mm_replaced = replace_all(main_mm_content, "PROJNAME", projname);
+    if (!mm_replaced) return 0;
+    
+    if (outdir && outdir[0] != '\0')
+        snprintf(path, sizeof(path), "%s/main.m", outdir);
+    else
+        snprintf(path, sizeof(path), "main.m");
+    
+    int result = write_file(path, mm_replaced, strlen(mm_replaced));
+    free(mm_replaced);
+    return result;
+}
+
+/* Windows Objective-C 用 .vcxproj を生成 */
+static int generate_winobjc_vcxproj(const char *projname, const char *outdir, const char *gnustep_path) {
+    char uuid_str[40];
+    generate_uuid(uuid_str);
+    
+    const char *vcxproj_content =
+        "<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n"
+        "<Project DefaultTargets=\"Build\" xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\">\r\n"
+        "  <ItemGroup Label=\"ProjectConfigurations\">\r\n"
+        "    <ProjectConfiguration Include=\"Debug|Win32\">\r\n"
+        "      <Configuration>Debug</Configuration>\r\n"
+        "      <Platform>Win32</Platform>\r\n"
+        "    </ProjectConfiguration>\r\n"
+        "    <ProjectConfiguration Include=\"Debug|x64\">\r\n"
+        "      <Configuration>Debug</Configuration>\r\n"
+        "      <Platform>x64</Platform>\r\n"
+        "    </ProjectConfiguration>\r\n"
+        "    <ProjectConfiguration Include=\"Release|Win32\">\r\n"
+        "      <Configuration>Release</Configuration>\r\n"
+        "      <Platform>Win32</Platform>\r\n"
+        "    </ProjectConfiguration>\r\n"
+        "    <ProjectConfiguration Include=\"Release|x64\">\r\n"
+        "      <Configuration>Release</Configuration>\r\n"
+        "      <Platform>x64</Platform>\r\n"
+        "    </ProjectConfiguration>\r\n"
+        "  </ItemGroup>\r\n"
+        "  <PropertyGroup Label=\"Globals\">\r\n"
+        "    <VCProjectVersion>17.0</VCProjectVersion>\r\n"
+        "    <Keyword>Win32Proj</Keyword>\r\n"
+        "    <ProjectGuid>{TEMPLATE_GUID}</ProjectGuid>\r\n"
+        "    <RootNamespace>PROJNAME</RootNamespace>\r\n"
+        "    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>\r\n"
+        "  </PropertyGroup>\r\n"
+        "  <Import Project=\"$(VCTargetsPath)\\Microsoft.Cpp.Default.props\" />\r\n"
+        "  \r\n"
+        "  <!-- Win32 Debug Configuration -->\r\n"
+        "  <PropertyGroup Condition=\"'$(Configuration)|$(Platform)'=='Debug|Win32'\" Label=\"Configuration\">\r\n"
+        "    <ConfigurationType>Application</ConfigurationType>\r\n"
+        "    <UseDebugLibraries>true</UseDebugLibraries>\r\n"
+        "    <PlatformToolset>ClangCL</PlatformToolset>\r\n"
+        "    <CharacterSet>Unicode</CharacterSet>\r\n"
+        "  </PropertyGroup>\r\n"
+        "  \r\n"
+        "  <!-- Win32 Release Configuration -->\r\n"
+        "  <PropertyGroup Condition=\"'$(Configuration)|$(Platform)'=='Release|Win32'\" Label=\"Configuration\">\r\n"
+        "    <ConfigurationType>Application</ConfigurationType>\r\n"
+        "    <UseDebugLibraries>false</UseDebugLibraries>\r\n"
+        "    <PlatformToolset>ClangCL</PlatformToolset>\r\n"
+        "    <WholeProgramOptimization>true</WholeProgramOptimization>\r\n"
+        "    <CharacterSet>Unicode</CharacterSet>\r\n"
+        "  </PropertyGroup>\r\n"
+        "  \r\n"
+        "  <!-- x64 Debug Configuration -->\r\n"
+        "  <PropertyGroup Condition=\"'$(Configuration)|$(Platform)'=='Debug|x64'\" Label=\"Configuration\">\r\n"
+        "    <ConfigurationType>Application</ConfigurationType>\r\n"
+        "    <UseDebugLibraries>true</UseDebugLibraries>\r\n"
+        "    <PlatformToolset>ClangCL</PlatformToolset>\r\n"
+        "    <CharacterSet>Unicode</CharacterSet>\r\n"
+        "  </PropertyGroup>\r\n"
+        "  \r\n"
+        "  <!-- x64 Release Configuration -->\r\n"
+        "  <PropertyGroup Condition=\"'$(Configuration)|$(Platform)'=='Release|x64'\" Label=\"Configuration\">\r\n"
+        "    <ConfigurationType>Application</ConfigurationType>\r\n"
+        "    <UseDebugLibraries>false</UseDebugLibraries>\r\n"
+        "    <PlatformToolset>ClangCL</PlatformToolset>\r\n"
+        "    <WholeProgramOptimization>true</WholeProgramOptimization>\r\n"
+        "    <CharacterSet>Unicode</CharacterSet>\r\n"
+        "  </PropertyGroup>\r\n"
+        "  \r\n"
+        "  <Import Project=\"$(VCTargetsPath)\\Microsoft.Cpp.props\" />\r\n"
+        "  <ImportGroup Label=\"ExtensionSettings\">\r\n"
+        "  </ImportGroup>\r\n"
+        "  <ImportGroup Label=\"Shared\">\r\n"
+        "  </ImportGroup>\r\n"
+        "  \r\n"
+        "  <ImportGroup Label=\"PropertySheets\" Condition=\"'$(Configuration)|$(Platform)'=='Debug|Win32'\">\r\n"
+        "    <Import Project=\"$(UserRootDir)\\Microsoft.Cpp.$(Platform).user.props\" Condition=\"exists('$(UserRootDir)\\Microsoft.Cpp.$(Platform).user.props')\" Label=\"LocalAppDataPlatform\" />\r\n"
+        "  </ImportGroup>\r\n"
+        "  <ImportGroup Label=\"PropertySheets\" Condition=\"'$(Configuration)|$(Platform)'=='Release|Win32'\">\r\n"
+        "    <Import Project=\"$(UserRootDir)\\Microsoft.Cpp.$(Platform).user.props\" Condition=\"exists('$(UserRootDir)\\Microsoft.Cpp.$(Platform).user.props')\" Label=\"LocalAppDataPlatform\" />\r\n"
+        "  </ImportGroup>\r\n"
+        "  <ImportGroup Label=\"PropertySheets\" Condition=\"'$(Configuration)|$(Platform)'=='Debug|x64'\">\r\n"
+        "    <Import Project=\"$(UserRootDir)\\Microsoft.Cpp.$(Platform).user.props\" Condition=\"exists('$(UserRootDir)\\Microsoft.Cpp.$(Platform).user.props')\" Label=\"LocalAppDataPlatform\" />\r\n"
+        "  </ImportGroup>\r\n"
+        "  <ImportGroup Label=\"PropertySheets\" Condition=\"'$(Configuration)|$(Platform)'=='Release|x64'\">\r\n"
+        "    <Import Project=\"$(UserRootDir)\\Microsoft.Cpp.$(Platform).user.props\" Condition=\"exists('$(UserRootDir)\\Microsoft.Cpp.$(Platform).user.props')\" Label=\"LocalAppDataPlatform\" />\r\n"
+        "  </ImportGroup>\r\n"
+        "  \r\n"
+        "  <PropertyGroup Label=\"UserMacros\" />\r\n"
+        "  \r\n"
+        "  <!-- Debug Win32 Configuration -->\r\n"
+        "  <ItemDefinitionGroup Condition=\"'$(Configuration)|$(Platform)'=='Debug|Win32'\">\r\n"
+        "    <ClCompile>\r\n"
+        "      <WarningLevel>Level3</WarningLevel>\r\n"
+        "      <SDLCheck>false</SDLCheck>\r\n"
+        "      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>\r\n"
+        "      <ConformanceMode>true</ConformanceMode>\r\n"
+        "    </ClCompile>\r\n"
+        "    <Link>\r\n"
+        "      <SubSystem>Windows</SubSystem>\r\n"
+        "      <GenerateDebugInformation>true</GenerateDebugInformation>\r\n"
+        "    </Link>\r\n"
+        "  </ItemDefinitionGroup>\r\n"
+        "  \r\n"
+        "  <!-- Release Win32 Configuration -->\r\n"
+        "  <ItemDefinitionGroup Condition=\"'$(Configuration)|$(Platform)'=='Release|Win32'\">\r\n"
+        "    <ClCompile>\r\n"
+        "      <WarningLevel>Level3</WarningLevel>\r\n"
+        "      <FunctionLevelLinking>true</FunctionLevelLinking>\r\n"
+        "      <IntrinsicFunctions>true</IntrinsicFunctions>\r\n"
+        "      <SDLCheck>false</SDLCheck>\r\n"
+        "      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>\r\n"
+        "      <ConformanceMode>true</ConformanceMode>\r\n"
+        "    </ClCompile>\r\n"
+        "    <Link>\r\n"
+        "      <SubSystem>Windows</SubSystem>\r\n"
+        "      <EnableCOMDATFolding>true</EnableCOMDATFolding>\r\n"
+        "      <OptimizeReferences>true</OptimizeReferences>\r\n"
+        "      <GenerateDebugInformation>true</GenerateDebugInformation>\r\n"
+        "    </Link>\r\n"
+        "  </ItemDefinitionGroup>\r\n"
+        "  \r\n"
+        "  <!-- Debug x64 Configuration -->\r\n"
+        "  <ItemDefinitionGroup Condition=\"'$(Configuration)|$(Platform)'=='Debug|x64'\">\r\n"
+        "    <ClCompile>\r\n"
+        "      <WarningLevel>Level3</WarningLevel>\r\n"
+        "      <SDLCheck>false</SDLCheck>\r\n"
+        "      <PreprocessorDefinitions>_DEBUG;_WINDOWS;GNUSTEP;GNUSTEP_WITH_DLL;GNUSTEP_RUNTIME=1;_NONFRAGILE_ABI=1;_NATIVE_OBJC_EXCEPTIONS;GSWARN;GSDIAGNOSE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>\r\n"
+        "      <ConformanceMode>true</ConformanceMode>\r\n"
+        "      <AdditionalIncludeDirectories>../GNUstep/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>\r\n"
+        "      <AdditionalOptions>-fobjc-runtime=gnustep-2.0 -Xclang -fexceptions -Xclang -fobjc-exceptions -fblocks -Xclang -fobjc-arc %(AdditionalOptions)</AdditionalOptions>\r\n"
+        "      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>\r\n"
+        "    </ClCompile>\r\n"
+        "    <Link>\r\n"
+        "      <SubSystem>Windows</SubSystem>\r\n"
+        "      <GenerateDebugInformation>true</GenerateDebugInformation>\r\n"
+        "      <AdditionalLibraryDirectories>../GNUstep/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>\r\n"
+        "      <AdditionalDependencies>gnustep-base.lib;objc.lib;dispatch.lib;%(AdditionalDependencies)</AdditionalDependencies>\r\n"
+        "    </Link>\r\n"
+        "  </ItemDefinitionGroup>\r\n"
+        "  \r\n"
+        "  <!-- Release x64 Configuration -->\r\n"
+        "  <ItemDefinitionGroup Condition=\"'$(Configuration)|$(Platform)'=='Release|x64'\">\r\n"
+        "    <ClCompile>\r\n"
+        "      <WarningLevel>Level3</WarningLevel>\r\n"
+        "      <FunctionLevelLinking>true</FunctionLevelLinking>\r\n"
+        "      <IntrinsicFunctions>true</IntrinsicFunctions>\r\n"
+        "      <SDLCheck>false</SDLCheck>\r\n"
+        "      <PreprocessorDefinitions>NDEBUG;_WINDOWS;GNUSTEP;GNUSTEP_WITH_DLL;GNUSTEP_RUNTIME=1;_NONFRAGILE_ABI=1;_NATIVE_OBJC_EXCEPTIONS;GSWARN;GSDIAGNOSE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>\r\n"
+        "      <ConformanceMode>true</ConformanceMode>\r\n"
+        "      <AdditionalIncludeDirectories>../GNUstep/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>\r\n"
+        "      <AdditionalOptions>-fobjc-runtime=gnustep-2.0 -Xclang -fexceptions -Xclang -fobjc-exceptions -fblocks -Xclang -fobjc-arc %(AdditionalOptions)</AdditionalOptions>\r\n"
+        "      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>\r\n"
+        "    </ClCompile>\r\n"
+        "    <Link>\r\n"
+        "      <SubSystem>Windows</SubSystem>\r\n"
+        "      <EnableCOMDATFolding>true</EnableCOMDATFolding>\r\n"
+        "      <OptimizeReferences>true</OptimizeReferences>\r\n"
+        "      <GenerateDebugInformation>true</GenerateDebugInformation>\r\n"
+        "      <AdditionalLibraryDirectories>../GNUstep/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>\r\n"
+        "      <AdditionalDependencies>gnustep-base.lib;objc.lib;dispatch.lib;%(AdditionalDependencies)</AdditionalDependencies>\r\n"
+        "    </Link>\r\n"
+        "  </ItemDefinitionGroup>\r\n"
+        "  \r\n"
+        "  <ItemGroup>\r\n"
+        "    <ClCompile Include=\"main.m\">\r\n"
+        "      <CompileAs Condition=\"'$(Configuration)|$(Platform)'=='Debug|x64'\">\r\n"
+        "      </CompileAs>\r\n"
+        "      <CompileAs Condition=\"'$(Configuration)|$(Platform)'=='Release|x64'\">\r\n"
+        "      </CompileAs>\r\n"
+        "    </ClCompile>\r\n"
+        "  </ItemGroup>\r\n"
+        "  \r\n"
+        "  <Import Project=\"$(VCTargetsPath)\\Microsoft.Cpp.targets\" />\r\n"
+        "  <ImportGroup Label=\"ExtensionTargets\">\r\n"
+        "  </ImportGroup>\r\n"
+        "</Project>\r\n";
+    
+    char path[1024];
+    char *vcxproj_replaced = replace_all(vcxproj_content, "TEMPLATE_GUID", uuid_str);
+    if (!vcxproj_replaced) return 0;
+    
+    char *vcxproj_final = replace_all(vcxproj_replaced, "PROJNAME", projname);
+    free(vcxproj_replaced);
+    if (!vcxproj_final) return 0;
+    
+    /* GNUstep パスの置換 - 大文字と小文字の両方をサポート */
+    char *vcxproj_with_gnustep = replace_all(vcxproj_final, "../GNUstep", gnustep_path);
+    free(vcxproj_final);
+    if (!vcxproj_with_gnustep) return 0;
+    
+    snprintf(path, sizeof(path), "%s/%s.vcxproj", outdir, projname);
+    
+    int result = write_file(path, vcxproj_with_gnustep, strlen(vcxproj_with_gnustep));
+    free(vcxproj_with_gnustep);
+    
+    /* .vcxproj.filters ファイルも生成 */
+    if (result) {
+        const char *filters_content =
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n"
+            "<Project ToolsVersion=\"4.0\" xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\">\r\n"
+            "  <ItemGroup>\r\n"
+            "    <Filter Include=\"Source Files\">\r\n"
+            "      <UniqueIdentifier>{7638f0f9-6678-4fbb-a566-48ce5e907a5e}</UniqueIdentifier>\r\n"
+            "      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx;mm;m</Extensions>\r\n"
+            "    </Filter>\r\n"
+            "    <Filter Include=\"Header Files\">\r\n"
+            "      <UniqueIdentifier>{f09553c9-ebca-4f3a-bf8d-449165354861}</UniqueIdentifier>\r\n"
+            "      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>\r\n"
+            "    </Filter>\r\n"
+            "    <Filter Include=\"Resource Files\">\r\n"
+            "      <UniqueIdentifier>{d7a5879e-2160-4685-aab7-b9b3091544b1}</UniqueIdentifier>\r\n"
+            "      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>\r\n"
+            "    </Filter>\r\n"
+            "  </ItemGroup>\r\n"
+            "  <ItemGroup>\r\n"
+            "    <ClCompile Include=\"main.mm\">\r\n"
+            "      <Filter>Source Files</Filter>\r\n"
+            "    </ClCompile>\r\n"
+            "  </ItemGroup>\r\n"
+            "</Project>\r\n";
+        
+        snprintf(path, sizeof(path), "%s/%s.vcxproj.filters", outdir, projname);
+        if (!write_file(path, filters_content, strlen(filters_content))) {
+            fprintf(stderr, "警告: .vcxproj.filters の書き込みに失敗しました\n");
+        }
+    }
+    
+    return result;
+}
+
+/* Windows Objective-C 用 .sln を生成 */
+static int generate_winobjc_sln(const char *projname, const char *outdir)
+{
+    char guid[40];
+    generate_uuid(guid);
+    
+    /* .sln ファイルの内容 */
+    const char *sln_content = 
+        "Microsoft Visual Studio Solution File, Format Version 12.00\r\n"
+        "# Visual Studio Version 17\r\n"
+        "VisualStudioVersion = 17.0.31919.166\r\n"
+        "MinimumVisualStudioVersion = 10.0.40219.1\r\n"
+        "Project(\"{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}\") = \"PROJNAME\", \"PROJNAME.vcxproj\", \"GUID\"\r\n"
+        "\tProjectSection(ProjectDependencies) = postProject\r\n"
+        "\tEndProjectSection\r\n"
+        "EndProject\r\n"
+        "Global\r\n"
+        "\tGlobalSection(SolutionConfigurationPlatforms) = preSolution\r\n"
+        "\t\tDebug|Win32 = Debug|Win32\r\n"
+        "\t\tDebug|x64 = Debug|x64\r\n"
+        "\t\tRelease|Win32 = Release|Win32\r\n"
+        "\t\tRelease|x64 = Release|x64\r\n"
+        "\tEndGlobalSection\r\n"
+        "\tGlobalSection(ProjectConfigurationPlatforms) = postSolution\r\n"
+        "\t\tGUID.Debug|Win32.ActiveCfg = Debug|Win32\r\n"
+        "\t\tGUID.Debug|Win32.Build.0 = Debug|Win32\r\n"
+        "\t\tGUID.Debug|x64.ActiveCfg = Debug|x64\r\n"
+        "\t\tGUID.Debug|x64.Build.0 = Debug|x64\r\n"
+        "\t\tGUID.Release|Win32.ActiveCfg = Release|Win32\r\n"
+        "\t\tGUID.Release|Win32.Build.0 = Release|Win32\r\n"
+        "\t\tGUID.Release|x64.ActiveCfg = Release|x64\r\n"
+        "\t\tGUID.Release|x64.Build.0 = Release|x64\r\n"
+        "\tEndGlobalSection\r\n"
+        "EndGlobal\r\n";
+    
+    char path[1024];
+    char *sln_replaced = replace_all(sln_content, "GUID", guid);
+    if (!sln_replaced) return 0;
+    
+    char *sln_final = replace_all(sln_replaced, "PROJNAME", projname);
+    free(sln_replaced);
+    if (!sln_final) return 0;
+    
+    /* outdir は projname フォルダへのパスなので、そこに projname.sln を出力する */
+    snprintf(path, sizeof(path), "%s/%s.sln", outdir, projname);
+    
+    int result = write_file(path, sln_final, strlen(sln_final));
+    free(sln_final);
     return result;
 }
 
@@ -1467,16 +1975,18 @@ static int generate_vcxproj(const char *projname, const char *outdir, int gen_sr
     int gen_vcxproj = 0;
     int gen_xcode = 0;
     int gen_objc = 0;  /* iOS と macOS の両方を生成 */
+    int gen_winobjc = 0;  /* Windows 用 Objective-C プロジェクトを生成 */
     const char *proj = NULL;
     const char *platform = NULL;  /* "macos" または "ios" */
     char outdir[512] = "";
+    char gnustep_path[512] = "../gnustep";  /* GNUstep のデフォルトパス */
 
     if (argc < 2) {
-        fprintf(stderr, "使い方: %s [-src] [-vcxproj] [-xcode [-platform macos|ios]] [-objc] [-path <outdir>] <プロジェクト名>\n", argv[0]);
+        fprintf(stderr, "使い方: %s [-src] [-vcxproj] [-xcode [-platform macos|ios]] [-objc] [-winobjc] [-path <outdir>] [-gnustep <gnustep_path>] <プロジェクト名>\n", argv[0]);
         return 1;
     }
 
-    /* 汎用引数解析: -src フラグ、-vcxproj フラグ、-xcode フラグ、-objc フラグ、-platform <os>、-path <outdir>、最後の非オプションを proj 名とする */
+    /* 汎用引数解析: -src フラグ、-vcxproj フラグ、-xcode フラグ、-objc フラグ、-platform <os>、-path <outdir>、-gnustep <path>、最後の非オプションを proj 名とする */
     for (int ai = 1; ai < argc; ai++) {
         if (strcmp(argv[ai], "-src") == 0) {
             gen_src = 1;
@@ -1493,6 +2003,10 @@ static int generate_vcxproj(const char *projname, const char *outdir, int gen_sr
         }
         if (strcmp(argv[ai], "-objc") == 0) {
             gen_objc = 1;
+            continue;
+        }
+        if (strcmp(argv[ai], "-winobjc") == 0) {
+            gen_winobjc = 1;
             continue;
         }
         if (strcmp(argv[ai], "-platform") == 0) {
@@ -1516,6 +2030,16 @@ static int generate_vcxproj(const char *projname, const char *outdir, int gen_sr
                 continue;
             } else {
                 fprintf(stderr, "エラー: -path に続けて出力先フォルダを指定してください\n");
+                return 1;
+            }
+        }
+        if (strcmp(argv[ai], "-gnustep") == 0) {
+            if (ai + 1 < argc) {
+                snprintf(gnustep_path, sizeof(gnustep_path), "%s", argv[ai + 1]);
+                ai++; /* skip value */
+                continue;
+            } else {
+                fprintf(stderr, "エラー: -gnustep に続けてGNUstepパスを指定してください\n");
                 return 1;
             }
         }
@@ -1580,8 +2104,8 @@ static int generate_vcxproj(const char *projname, const char *outdir, int gen_sr
     /* ファイルを書き出す (outdir が指定されていればそこへ) */
     char path[1024];
     
-    /* -objc 指定時は DSP/DSW ファイルを出力しない */
-    if (!gen_objc) {
+    /* -objc または -winobjc 指定時は DSP/DSW ファイルを出力しない */
+    if (!gen_objc && !gen_winobjc) {
         if (gen_src && outdir[0] != '\0') snprintf(path, sizeof(path), "%s\\win_%s.dsp", outdir, proj);
         else snprintf(path, sizeof(path), "win_%s.dsp", proj);
         if (!write_file(path, win_out, strlen(win_out))) { fprintf(stderr, "エラー: %s の書き込みに失敗しました\n", path); }
@@ -1602,7 +2126,7 @@ static int generate_vcxproj(const char *projname, const char *outdir, int gen_sr
     }
 
     /* -vcxproj 指定時は .dsp/.dsw も生成する */
-    if (gen_vcxproj) {
+    if (gen_vcxproj && !gen_winobjc) {
         /* con_*.dsp と win_*.dsp を生成 */
         if (!generate_dsw(proj, outdir[0] != '\0' ? outdir : "")) fprintf(stderr, "警告: .dsw の生成に失敗しました\n");
         if (!generate_build_bat(proj, outdir[0] != '\0' ? outdir : "")) fprintf(stderr, "警告: build バッチの生成に失敗しました\n");
@@ -1688,8 +2212,34 @@ static int generate_vcxproj(const char *projname, const char *outdir, int gen_sr
         if (!generate_parent_xcode_project(proj, proj_root_dir)) fprintf(stderr, "警告: Parent Xcode プロジェクトの生成に失敗しました\n");
     }
 
+    /* -winobjc 指定時は Windows Objective-C プロジェクトを生成 */
+    if (gen_winobjc) {
+        char winobjc_proj_dir[512];
+        
+        /* Windows Objective-C プロジェクト専用ディレクトリを設定: projname フォルダ */
+        if (outdir[0] != '\0') {
+            snprintf(winobjc_proj_dir, sizeof(winobjc_proj_dir), "%s/%s", outdir, proj);
+        } else {
+            snprintf(winobjc_proj_dir, sizeof(winobjc_proj_dir), "%s", proj);
+        }
+        
+        /* プロジェクトディレクトリ作成 */
+        if (!make_dir_recursive(winobjc_proj_dir)) {
+            fprintf(stderr, "警告: Windows Objective-C プロジェクトフォルダ '%s' の作成に失敗しました\n", winobjc_proj_dir);
+        }
+        
+        /* Windows Objective-C main.m を生成（projnameフォルダ内） */
+        if (!generate_winobjc_main_m(proj, winobjc_proj_dir)) fprintf(stderr, "警告: Windows Objective-C main.m の生成に失敗しました\n");
+        
+        /* Windows Objective-C プロジェクトファイルを生成（projnameフォルダ内） */
+        if (!generate_winobjc_vcxproj(proj, winobjc_proj_dir, gnustep_path)) fprintf(stderr, "警告: Windows Objective-C .vcxproj の生成に失敗しました\n");
+        
+        /* Windows Objective-C ソリューションファイルを生成（projnameフォルダ内） */
+        if (!generate_winobjc_sln(proj, winobjc_proj_dir)) fprintf(stderr, "警告: Windows Objective-C .sln の生成に失敗しました\n");
+    }
+
     /* 出力メッセージ */
-    if (!gen_objc) {
+    if (!gen_objc && !gen_winobjc) {
         printf("生成しました: win_%s.dsp, con_%s.dsp, %s.dsw, build_%s.bat\n", proj, proj, proj, proj);
     }
     if (gen_src) printf("生成しました: %s_main.c\n", proj);
@@ -1712,6 +2262,12 @@ static int generate_vcxproj(const char *projname, const char *outdir, int gen_sr
         printf("生成しました: %s/macos_%s/macos_%s.xcodeproj/project.pbxproj\n", proj, proj, proj);
         printf("生成しました: %s/macos_%s/macos_%s_main.m\n", proj, proj, proj);
         printf("生成しました: %s/macos_%s/Info.plist\n", proj, proj);
+    }
+    if (gen_winobjc) {
+        printf("生成しました: %s/%s.sln\n", proj, proj);
+        printf("生成しました: %s/%s.vcxproj\n", proj, proj);
+        printf("生成しました: %s/%s.vcxproj.filters\n", proj, proj);
+        printf("生成しました: %s/main.mm\n", proj);
     }
 
     free(win_out); free(con_out);
