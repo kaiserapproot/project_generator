@@ -617,6 +617,9 @@ static int generate_info_plist_macos(const char *projname, const char *outdir) {
 /* Windows Objective-C 用 main.m を生成 */
 static int generate_winobjc_main_m(const char *projname, const char *outdir) {
     const char *main_mm_content =
+        "// PROJNAME.m : Objective-C デリゲート/ビュー/ビューコントローラ構造でのWin32アプリ\r\n"
+        "//\r\n"
+        "\r\n"
         "#include <Foundation/Foundation.h>\r\n"
         "#define WIN32_LEAN_AND_MEAN\r\n"
         "#include <windows.h>\r\n"
@@ -634,23 +637,23 @@ static int generate_winobjc_main_m(const char *projname, const char *outdir) {
         "\r\n"
         "@implementation AppDelegate\r\n"
         "- (void)applicationWillFinishLaunching {\r\n"
-        "    NSLog(@\"[AppDelegate] application startup preparing\");\r\n"
+        "    NSLog(@\"[AppDelegate] \\u30a2\\u30d7\\u30ea\\u30b1\\u30fc\\u30b7\\u30e7\\u30f3\\u306e\\u8d77\\u52d5\\u6e96\\u5099\\u4e2d\");\r\n"
         "}\r\n"
         "- (void)applicationDidFinishLaunching {\r\n"
-        "    NSLog(@\"[AppDelegate] application startup completed\");\r\n"
+        "    NSLog(@\"[AppDelegate] \\u30a2\\u30d7\\u30ea\\u30b1\\u30fc\\u30b7\\u30e7\\u30f3\\u306e\\u8d77\\u52d5\\u304c\\u5b8c\\u4e86\\u3057\\u307e\\u3057\\u305f\");\r\n"
         "}\r\n"
         "- (void)applicationDidBecomeActive {\r\n"
-        "    NSLog(@\"[AppDelegate] application became active\");\r\n"
+        "    NSLog(@\"[AppDelegate] \\u30a2\\u30af\\u30c6\\u30a3\\u30d6\\u306b\\u306a\\u308a\\u307e\\u3057\\u305f\");\r\n"
         "}\r\n"
         "- (void)applicationWillResignActive {\r\n"
-        "    NSLog(@\"[AppDelegate] application became inactive\");\r\n"
+        "    NSLog(@\"[AppDelegate] \\u975e\\u30a2\\u30af\\u30c6\\u30a3\\u30d6\\u306b\\u306a\\u308a\\u307e\\u3057\\u305f\");\r\n"
         "}\r\n"
         "- (void)applicationWillTerminate {\r\n"
-        "    NSLog(@\"[AppDelegate] application will terminate\");\r\n"
+        "    NSLog(@\"[AppDelegate] \\u30a2\\u30d7\\u30ea\\u30b1\\u30fc\\u30b7\\u30e7\\u30f3\\u3092\\u7d42\\u4e86\\u3057\\u307e\\u3059\");\r\n"
         "}\r\n"
         "@end\r\n"
         "\r\n"
-        "// --- MyView ---\r\n"
+        "// --- View ---\r\n"
         "@interface MyView : NSObject\r\n"
         "@property (nonatomic, assign) HWND hWnd;\r\n"
         "- (void)drawRect;\r\n"
@@ -661,15 +664,16 @@ static int generate_winobjc_main_m(const char *projname, const char *outdir) {
         "- (void)drawRect {\r\n"
         "    PAINTSTRUCT ps;\r\n"
         "    HDC hdc = BeginPaint(self.hWnd, &ps);\r\n"
-        "    TextOutW(hdc, 20, 20, L\"Hello Objective-C!\", 18);\r\n"
+        "    TextOutW(hdc, 20, 20, L\"Hello from MyView\", 18);\r\n"
         "    EndPaint(self.hWnd, &ps);\r\n"
         "}\r\n"
         "- (void)handleMouseDownAt:(POINT)pt {\r\n"
-        "    NSLog(@\"[MyView] mouse clicked at x=%ld, y=%ld\", pt.x, pt.y);\r\n"
+        "    NSLog(@\"[MyView] \\u30de\\u30a6\\u30b9\\u304c\\u30af\\u30ea\\u30c3\\u30af\\u3055\\u308c\\u307e\\u3057\\u305f: x=%ld, y=%ld\", pt.x, pt.y);\r\n"
+        "    // \\u5fc5\\u8981\\u306a\\u3089\\u3053\\u3053\\u3067\\u518d\\u63cf\\u753b\\u3084\\u4ed6\\u306e\\u51e6\\u7406\r\n"
         "}\r\n"
         "@end\r\n"
         "\r\n"
-        "// --- MyViewController ---\r\n"
+        "// --- ViewController ---\r\n"
         "@interface MyViewController : NSObject\r\n"
         "@property (nonatomic, strong) MyView *view;\r\n"
         "- (void)loadViewWithParent:(HWND)parent;\r\n"
@@ -680,7 +684,7 @@ static int generate_winobjc_main_m(const char *projname, const char *outdir) {
         "- (void)loadViewWithParent:(HWND)parent {\r\n"
         "    self.view = [[MyView alloc] init];\r\n"
         "    self.view.hWnd = parent;\r\n"
-        "    NSLog(@\"[MyViewController] view attached to parent window\");\r\n"
+        "    NSLog(@\"[MyViewController] \\u30d3\\u30e5\\u30fc\\u304c\\u89aa\\u30a6\\u30a3\\u30f3\\u30c9\\u30a6\\u306b\\u30a2\\u30bf\\u30c3\\u30c1\\u3055\\u308c\\u307e\\u3057\\u305f\");\r\n"
         "}\r\n"
         "- (void)handleMouseDownAt:(POINT)pt {\r\n"
         "    if (self.view) {\r\n"
@@ -689,23 +693,22 @@ static int generate_winobjc_main_m(const char *projname, const char *outdir) {
         "}\r\n"
         "@end\r\n"
         "\r\n"
-        "// --- Global Variables ---\r\n"
+        "// \\u30b0\\u30ed\\u30fc\\u30d0\\u30eb\\u5909\\u6570\r\n"
         "HINSTANCE hInst;\r\n"
         "WCHAR szWindowClass[] = L\"ObjCWin32WindowClass\";\r\n"
         "AppDelegate *appDelegate;\r\n"
         "MyViewController *viewController;\r\n"
         "\r\n"
-        "// --- Function Prototypes ---\r\n"
-        "ATOM MyRegisterClass(HINSTANCE hInstance);\r\n"
-        "BOOL InitInstance(HINSTANCE, int);\r\n"
-        "LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);\r\n"
+        "// \\u30d7\\u30ed\\u30c8\\u30bf\\u30a4\\u30d7\\u5ba3\\u8a00\r\n"
+        "ATOM                MyRegisterClass(HINSTANCE hInstance);\r\n"
+        "BOOL                InitInstance(HINSTANCE, int);\r\n"
+        "LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);\r\n"
         "\r\n"
-        "// --- WinMain ---\r\n"
-        "int APIENTRY wWinMain(\r\n"
-        "    _In_ HINSTANCE hInstance,\r\n"
-        "    _In_opt_ HINSTANCE hPrevInstance,\r\n"
-        "    _In_ LPWSTR lpCmdLine,\r\n"
-        "    _In_ int nCmdShow)\r\n"
+        "// WinMain\r\n"
+        "int APIENTRY wWinMain(_In_ HINSTANCE hInstance,\r\n"
+        "                     _In_opt_ HINSTANCE hPrevInstance,\r\n"
+        "                     _In_ LPWSTR    lpCmdLine,\r\n"
+        "                     _In_ int       nCmdShow)\r\n"
         "{\r\n"
         "    UNREFERENCED_PARAMETER(hPrevInstance);\r\n"
         "    UNREFERENCED_PARAMETER(lpCmdLine);\r\n"
@@ -745,45 +748,42 @@ static int generate_winobjc_main_m(const char *projname, const char *outdir) {
         "    return (int) msg.wParam;\r\n"
         "}\r\n"
         "\r\n"
-        "// --- Register Window Class ---\r\n"
+        "// \\u30a6\\u30a3\\u30f3\\u30c9\\u30a6\\u30af\\u30e9\\u30b9\\u767b\\u9332\r\n"
         "ATOM MyRegisterClass(HINSTANCE hInstance)\r\n"
         "{\r\n"
         "    WNDCLASSEXW wcex;\r\n"
         "    wcex.cbSize = sizeof(WNDCLASSEX);\r\n"
-        "    wcex.style = CS_HREDRAW | CS_VREDRAW;\r\n"
-        "    wcex.lpfnWndProc = WndProc;\r\n"
-        "    wcex.cbClsExtra = 0;\r\n"
-        "    wcex.cbWndExtra = 0;\r\n"
-        "    wcex.hInstance = hInstance;\r\n"
-        "    wcex.hIcon = LoadIcon(0, IDI_APPLICATION);\r\n"
-        "    wcex.hCursor = LoadCursor(0, IDC_ARROW);\r\n"
-        "    wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);\r\n"
-        "    wcex.lpszMenuName = 0;\r\n"
-        "    wcex.lpszClassName = szWindowClass;\r\n"
-        "    wcex.hIconSm = LoadIcon(0, IDI_APPLICATION);\r\n"
+        "    wcex.style          = CS_HREDRAW | CS_VREDRAW;\r\n"
+        "    wcex.lpfnWndProc    = WndProc;\r\n"
+        "    wcex.cbClsExtra     = 0;\r\n"
+        "    wcex.cbWndExtra     = 0;\r\n"
+        "    wcex.hInstance      = hInstance;\r\n"
+        "    wcex.hIcon          = LoadIcon(0, IDI_APPLICATION); // \\u30c7\\u30d5\\u30a9\\u30eb\\u30c8\\u30a2\\u30a4\\u30b3\\u30f3\r\n"
+        "    wcex.hCursor        = LoadCursor(0, IDC_ARROW);\r\n"
+        "    wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);\r\n"
+        "    wcex.lpszMenuName   = 0; // \\u30e1\\u30cb\\u30e5\\u30fc\\u306a\\u3057\r\n"
+        "    wcex.lpszClassName  = szWindowClass;\r\n"
+        "    wcex.hIconSm        = LoadIcon(0, IDI_APPLICATION); // \\u30c7\\u30d5\\u30a9\\u30eb\\u30c8\\u30a2\\u30a4\\u30b3\\u30f3\r\n"
         "    return RegisterClassExW(&wcex);\r\n"
         "}\r\n"
         "\r\n"
-        "// --- Initialize Instance ---\r\n"
+        "// \\u30a6\\u30a3\\u30f3\\u30c9\\u30a6\\u751f\\u6210\r\n"
         "BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)\r\n"
         "{\r\n"
-        "    hInst = hInstance;\r\n"
-        "    LPCWSTR windowTitle = L\"PROJNAME\";\r\n"
-        "    HWND hWnd = CreateWindowW(\r\n"
-        "        szWindowClass,\r\n"
-        "        windowTitle,\r\n"
-        "        WS_OVERLAPPEDWINDOW,\r\n"
-        "        CW_USEDEFAULT, 0, CW_USEDEFAULT, 0,\r\n"
-        "        0, 0, hInstance, 0);\r\n"
-        "    if (!hWnd) return FALSE;\r\n"
-        "    ShowWindow(hWnd, nCmdShow);\r\n"
-        "    UpdateWindow(hWnd);\r\n"
-        "    viewController = [[MyViewController alloc] init];\r\n"
-        "    [viewController loadViewWithParent:hWnd];\r\n"
-        "    return TRUE;\r\n"
+        "   hInst = hInstance;\r\n"
+        "   LPCWSTR windowTitle = L\"Hello Objective-C Window\";\r\n"
+        "   HWND hWnd = CreateWindowW(szWindowClass, windowTitle, WS_OVERLAPPEDWINDOW,\r\n"
+        "      CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, 0, 0, hInstance, 0);\r\n"
+        "   if (!hWnd) return FALSE;\r\n"
+        "   ShowWindow(hWnd, nCmdShow);\r\n"
+        "   UpdateWindow(hWnd);\r\n"
+        "   // ViewController\\u751f\\u6210\\u30fbView\\u30ed\\u30fc\\u30c9\r\n"
+        "   viewController = [[MyViewController alloc] init];\r\n"
+        "   [viewController loadViewWithParent:hWnd];\r\n"
+        "   return TRUE;\r\n"
         "}\r\n"
         "\r\n"
-        "// --- Window Procedure ---\r\n"
+        "// \\u30a6\\u30a3\\u30f3\\u30c9\\u30a6\\u30d7\\u30ed\\u30b7\\u30fc\\u30b8\\u30e3\r\n"
         "LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)\r\n"
         "{\r\n"
         "    switch (message)\r\n"
@@ -1976,13 +1976,14 @@ static int generate_vcxproj(const char *projname, const char *outdir, int gen_sr
     int gen_xcode = 0;
     int gen_objc = 0;  /* iOS と macOS の両方を生成 */
     int gen_winobjc = 0;  /* Windows 用 Objective-C プロジェクトを生成 */
+    int gen_vs6 = 0;  /* Visual C++ 6.0 プロジェクトを生成 */
     const char *proj = NULL;
     const char *platform = NULL;  /* "macos" または "ios" */
     char outdir[512] = "";
     char gnustep_path[512] = "../gnustep";  /* GNUstep のデフォルトパス */
 
     if (argc < 2) {
-        fprintf(stderr, "使い方: %s [-src] [-vcxproj] [-xcode [-platform macos|ios]] [-objc] [-winobjc] [-path <outdir>] [-gnustep <gnustep_path>] <プロジェクト名>\n", argv[0]);
+        fprintf(stderr, "使い方: %s [-src] [-vcxproj] [-xcode [-platform macos|ios]] [-objc] [-winobjc] [-vs6] [-path <outdir>] [-gnustep <gnustep_path>] <プロジェクト名>\n", argv[0]);
         return 1;
     }
 
@@ -2007,6 +2008,10 @@ static int generate_vcxproj(const char *projname, const char *outdir, int gen_sr
         }
         if (strcmp(argv[ai], "-winobjc") == 0) {
             gen_winobjc = 1;
+            continue;
+        }
+        if (strcmp(argv[ai], "-vs6") == 0) {
+            gen_vs6 = 1;
             continue;
         }
         if (strcmp(argv[ai], "-platform") == 0) {
@@ -2052,44 +2057,55 @@ static int generate_vcxproj(const char *projname, const char *outdir, int gen_sr
         return 1;
     }
 
-    /* If -src is set and no explicit outdir given, default outdir to project name */
-    if (gen_src && outdir[0] == '\0') {
+    /* -vcxproj または -vs6 指定時で -path が指定されていない場合、プロジェクト名フォルダを使用 */
+    if ((gen_vcxproj || gen_vs6) && outdir[0] == '\0') {
         snprintf(outdir, sizeof(outdir), "%s", proj);
     }
 
-    /* 埋め込みテンプレートはソース上部のグローバル変数 `win_template_literal` と
-     * `con_template_literal` を使用します（外部ファイルは不要）。 */
+    /* If -src is set and no explicit outdir given, default outdir to project name */
+    if (gen_src && outdir[0] == '\0' && !gen_vcxproj && !gen_vs6) {
+        snprintf(outdir, sizeof(outdir), "%s", proj);
+    }
 
-    /* コピーして free できる形にする（既存ロジックを流用） */
-    char *win_tpl = (char*)malloc(strlen(win_template_literal) + 1);
-    char *con_tpl = (char*)malloc(strlen(con_template_literal) + 1);
-    if (!win_tpl || !con_tpl) {
-        fprintf(stderr, "エラー: テンプレート文字列の割り当てに失敗しました\n");
+    /* DSPテンプレート処理（-vcxproj, -vs6, -objc, -winobjc 以外の時のみ） */
+    char *win_out = NULL;
+    char *con_out = NULL;
+    
+    if (!gen_vcxproj && !gen_vs6 && !gen_objc && !gen_winobjc) {
+        /* 埋め込みテンプレートはソース上部のグローバル変数 `win_template_literal` と
+         * `con_template_literal` を使用します（外部ファイルは不要）。 */
+
+        /* コピーして free できる形にする（既存ロジックを流用） */
+        char *win_tpl = (char*)malloc(strlen(win_template_literal) + 1);
+        char *con_tpl = (char*)malloc(strlen(con_template_literal) + 1);
+        if (!win_tpl || !con_tpl) {
+            fprintf(stderr, "エラー: テンプレート文字列の割り当てに失敗しました\n");
+            free(win_tpl); free(con_tpl);
+            return 1;
+        }
+        strcpy(win_tpl, win_template_literal);
+        strcpy(con_tpl, con_template_literal);
+
+        /* 単純置換: TEMPLATE -> proj */
+        win_out = replace_all(win_tpl, "TEMPLATE", proj);
+        con_out = replace_all(con_tpl, "TEMPLATE", proj);
         free(win_tpl); free(con_tpl);
-        return 1;
-    }
-    strcpy(win_tpl, win_template_literal);
-    strcpy(con_tpl, con_template_literal);
+        if (!win_out || !con_out) {
+            fprintf(stderr, "エラー: 置換処理に失敗しました\n");
+            free(win_out); free(con_out);
+            return 1;
+        }
 
-    /* 単純置換: TEMPLATE -> proj */
-    char *win_out = replace_all(win_tpl, "TEMPLATE", proj);
-    char *con_out = replace_all(con_tpl, "TEMPLATE", proj);
-    free(win_tpl); free(con_tpl);
-    if (!win_out || !con_out) {
-        fprintf(stderr, "エラー: 置換処理に失敗しました\n");
-        free(win_out); free(con_out);
-        return 1;
-    }
+        /* con_template は既にコンソールアプリケーション用テンプレートなので補正不要 */
 
-    /* con_template は既にコンソールアプリケーション用テンプレートなので補正不要 */
-
-    /* -src 指定時は Source Files グループに SOURCE を挿入 */
-    if (gen_src) {
-        char *tmp;
-        tmp = insert_main_into_dsp(win_out, proj);
-        if (tmp) { free(win_out); win_out = tmp; }
-        tmp = insert_main_into_dsp(con_out, proj);
-        if (tmp) { free(con_out); con_out = tmp; }
+        /* -src 指定時は Source Files グループに SOURCE を挿入 */
+        if (gen_src) {
+            char *tmp;
+            tmp = insert_main_into_dsp(win_out, proj);
+            if (tmp) { free(win_out); win_out = tmp; }
+            tmp = insert_main_into_dsp(con_out, proj);
+            if (tmp) { free(con_out); con_out = tmp; }
+        }
     }
 
     /* 出力ディレクトリ作成 (必要なら) */
@@ -2104,8 +2120,8 @@ static int generate_vcxproj(const char *projname, const char *outdir, int gen_sr
     /* ファイルを書き出す (outdir が指定されていればそこへ) */
     char path[1024];
     
-    /* -objc または -winobjc 指定時は DSP/DSW ファイルを出力しない */
-    if (!gen_objc && !gen_winobjc) {
+    /* デフォルト: DSP/DSW ファイルを出力 */
+    if (!gen_objc && !gen_winobjc && !gen_vcxproj && !gen_vs6) {
         if (gen_src && outdir[0] != '\0') snprintf(path, sizeof(path), "%s\\win_%s.dsp", outdir, proj);
         else snprintf(path, sizeof(path), "win_%s.dsp", proj);
         if (!write_file(path, win_out, strlen(win_out))) { fprintf(stderr, "エラー: %s の書き込みに失敗しました\n", path); }
@@ -2113,29 +2129,28 @@ static int generate_vcxproj(const char *projname, const char *outdir, int gen_sr
         else snprintf(path, sizeof(path), "con_%s.dsp", proj);
         if (!write_file(path, con_out, strlen(con_out))) { fprintf(stderr, "エラー: %s の書き込みに失敗しました\n", path); }
 
-        /* .dsw と build バッチを生成 (デフォルト、またはvcxproj指定時も) */
-        if (!gen_vcxproj) {
-            if (!generate_dsw(proj, outdir[0] != '\0' ? outdir : "")) fprintf(stderr, "警告: .dsw の生成に失敗しました\n");
-            if (!generate_build_bat(proj, outdir[0] != '\0' ? outdir : "")) fprintf(stderr, "警告: build バッチの生成に失敗しました\n");
-        }
+        /* .dsw と build バッチを生成 */
+        if (!generate_dsw(proj, outdir[0] != '\0' ? outdir : "")) fprintf(stderr, "警告: .dsw の生成に失敗しました\n");
+        if (!generate_build_bat(proj, outdir[0] != '\0' ? outdir : "")) fprintf(stderr, "警告: build バッチの生成に失敗しました\n");
     }
 
-    /* -src 指定時に main.c を生成 */
-    if (gen_src) {
+    /* -src 指定時に main.c を生成（-vcxproj と -vs6 以外） */
+    if (gen_src && !gen_vcxproj && !gen_vs6 && !gen_objc && !gen_winobjc) {
         if (!generate_main_c(proj, outdir[0] != '\0' ? outdir : "")) fprintf(stderr, "警告: main.c の生成に失敗しました\n");
     }
 
-    /* -vcxproj 指定時は .dsp/.dsw も生成する */
+    /* -vcxproj 指定時は専用フォルダにVisual Studioプロジェクトを生成 */
     if (gen_vcxproj && !gen_winobjc) {
-        /* con_*.dsp と win_*.dsp を生成 */
-        if (!generate_dsw(proj, outdir[0] != '\0' ? outdir : "")) fprintf(stderr, "警告: .dsw の生成に失敗しました\n");
-        if (!generate_build_bat(proj, outdir[0] != '\0' ? outdir : "")) fprintf(stderr, "警告: build バッチの生成に失敗しました\n");
+        /* outdirは既に設定済み（プロジェクト名または-pathで指定されたパス） */
         
         /* Visual Studio プロジェクトを生成 */
-        if (!generate_vcxproj(proj, outdir[0] != '\0' ? outdir : "", gen_src)) fprintf(stderr, "警告: Visual Studio プロジェクトの生成に失敗しました\n");
+        if (!generate_vcxproj(proj, outdir, 1)) fprintf(stderr, "警告: Visual Studio プロジェクトの生成に失敗しました\n");
         
         /* Visual Studio ソリューションファイルを生成 */
-        if (!generate_sln(proj, outdir[0] != '\0' ? outdir : "")) fprintf(stderr, "警告: Visual Studio ソリューションファイルの生成に失敗しました\n");
+        if (!generate_sln(proj, outdir)) fprintf(stderr, "警告: Visual Studio ソリューションファイルの生成に失敗しました\n");
+        
+        /* main.c を生成 */
+        if (!generate_main_c(proj, outdir)) fprintf(stderr, "警告: main.c の生成に失敗しました\n");
     }
 
     /* -xcode 指定時は Xcode プロジェクトを生成 */
@@ -2239,15 +2254,16 @@ static int generate_vcxproj(const char *projname, const char *outdir, int gen_sr
     }
 
     /* 出力メッセージ */
-    if (!gen_objc && !gen_winobjc) {
+    if (!gen_objc && !gen_winobjc && !gen_vcxproj && !gen_vs6) {
         printf("生成しました: win_%s.dsp, con_%s.dsp, %s.dsw, build_%s.bat\n", proj, proj, proj, proj);
     }
-    if (gen_src) printf("生成しました: %s_main.c\n", proj);
-    if (gen_vcxproj) {
-        printf("生成しました: %s.sln\n", proj);
-        printf("生成しました: win_%s.vcxproj, con_%s.vcxproj\n", proj, proj);
-        printf("生成しました: win_%s.vcxproj.user, con_%s.vcxproj.user\n", proj, proj);
-        if (gen_src) printf("生成しました: win_%s.vcxproj.filters, con_%s.vcxproj.filters\n", proj, proj);
+    if (gen_src && !gen_vcxproj && !gen_vs6) printf("生成しました: %s_main.c\n", proj);
+    if (gen_vcxproj && !gen_winobjc) {
+        printf("生成しました: %s\\%s.sln\n", proj, proj);
+        printf("生成しました: %s\\win_%s.vcxproj, %s\\con_%s.vcxproj\n", proj, proj, proj, proj);
+        printf("生成しました: %s\\win_%s.vcxproj.user, %s\\con_%s.vcxproj.user\n", proj, proj, proj, proj);
+        printf("生成しました: %s\\win_%s.vcxproj.filters, %s\\con_%s.vcxproj.filters\n", proj, proj, proj, proj);
+        printf("生成しました: %s\\%s_main.c\n", proj, proj);
     }
     if (gen_xcode) {
         printf("生成しました: %s/%s.xcodeproj/project.pbxproj\n", proj, proj);
@@ -2270,7 +2286,85 @@ static int generate_vcxproj(const char *projname, const char *outdir, int gen_sr
         printf("生成しました: %s/main.mm\n", proj);
     }
 
-    free(win_out); free(con_out);
+    /* -vs6 指定時は Visual C++ 6.0 プロジェクトを生成 */
+    if (gen_vs6) {
+        /* DSPテンプレートを準備 */
+        char *win_tpl = (char*)malloc(strlen(win_template_literal) + 1);
+        char *con_tpl = (char*)malloc(strlen(con_template_literal) + 1);
+        if (!win_tpl || !con_tpl) {
+            fprintf(stderr, "エラー: テンプレート文字列の割り当てに失敗しました\n");
+            free(win_tpl); free(con_tpl);
+            return 1;
+        }
+        strcpy(win_tpl, win_template_literal);
+        strcpy(con_tpl, con_template_literal);
+
+        /* 単純置換: TEMPLATE -> proj */
+        char *vs6_win_out = replace_all(win_tpl, "TEMPLATE", proj);
+        char *vs6_con_out = replace_all(con_tpl, "TEMPLATE", proj);
+        free(win_tpl); free(con_tpl);
+        if (!vs6_win_out || !vs6_con_out) {
+            fprintf(stderr, "エラー: 置換処理に失敗しました\n");
+            free(vs6_win_out); free(vs6_con_out);
+            return 1;
+        }
+
+        /* main.cを含めるための処理 */
+        char *tmp;
+        tmp = insert_main_into_dsp(vs6_win_out, proj);
+        if (tmp) { free(vs6_win_out); vs6_win_out = tmp; }
+        tmp = insert_main_into_dsp(vs6_con_out, proj);
+        if (tmp) { free(vs6_con_out); vs6_con_out = tmp; }
+        
+        char vs6_proj_dir[512];
+        
+        /* VS6 プロジェクト専用ディレクトリを設定: projname フォルダ */
+        snprintf(vs6_proj_dir, sizeof(vs6_proj_dir), "%s", proj);
+        
+        /* プロジェクトディレクトリ作成 */
+        if (!make_dir_recursive(vs6_proj_dir)) {
+            fprintf(stderr, "エラー: Visual C++ 6.0 プロジェクトフォルダ '%s' の作成に失敗しました\n", vs6_proj_dir);
+            free(vs6_win_out); free(vs6_con_out);
+            return 1;
+        }
+        
+        /* win_*.dsp と con_*.dsp を生成 */
+        snprintf(path, sizeof(path), "%s\\win_%s.dsp", vs6_proj_dir, proj);
+        if (!write_file(path, vs6_win_out, strlen(vs6_win_out))) { 
+            fprintf(stderr, "エラー: %s の書き込みに失敗しました\n", path); 
+        }
+        
+        snprintf(path, sizeof(path), "%s\\con_%s.dsp", vs6_proj_dir, proj);
+        if (!write_file(path, vs6_con_out, strlen(vs6_con_out))) { 
+            fprintf(stderr, "エラー: %s の書き込みに失敗しました\n", path); 
+        }
+        
+        /* .dsw を生成 */
+        if (!generate_dsw(proj, vs6_proj_dir)) {
+            fprintf(stderr, "警告: .dsw の生成に失敗しました\n");
+        }
+        
+        /* build バッチを生成 */
+        if (!generate_build_bat(proj, vs6_proj_dir)) {
+            fprintf(stderr, "警告: build バッチの生成に失敗しました\n");
+        }
+        
+        /* main.c を生成 */
+        if (!generate_main_c(proj, vs6_proj_dir)) {
+            fprintf(stderr, "警告: main.c の生成に失敗しました\n");
+        }
+        
+        printf("生成しました: %s\\win_%s.dsp\n", vs6_proj_dir, proj);
+        printf("生成しました: %s\\con_%s.dsp\n", vs6_proj_dir, proj);
+        printf("生成しました: %s\\%s.dsw\n", vs6_proj_dir, proj);
+        printf("生成しました: %s\\build_%s.bat\n", vs6_proj_dir, proj);
+        printf("生成しました: %s\\%s_main.c\n", vs6_proj_dir, proj);
+        
+        free(vs6_win_out); free(vs6_con_out);
+    }
+
+    if (win_out) free(win_out);
+    if (con_out) free(con_out);
     return 0;
 }
 
