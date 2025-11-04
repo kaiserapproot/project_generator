@@ -1,3 +1,4 @@
+
 /* create_dual_dsp.bat の main.c 出力例と同じ内容 */
 static const char main_c_literal[] =
 "#include <windows.h>\r\n"
@@ -114,7 +115,7 @@ static const char main_c_literal[] =
 #endif
 
 #include <ctype.h>
-
+static int make_dir_recursive(const char* path);
  /* 埋め込みテンプレート: win_template.dsp の完全な内容 */
 static const char win_template_literal[] =
 "# Microsoft Developer Studio Project File - Name=\"win_TEMPLATE\" - Package Owner=<4>\r\n"
@@ -481,6 +482,20 @@ static char* replace_all(const char* str, const char* from, const char* to)
 }
 
 /* UUID を生成する（シンプルな実装） */
+/* 古いツールチェーン向けに snprintf のプロトタイプを確保する
+
+一部の環境では <stdio.h> に snprintf の宣言がないか、
+別名（例: _snprintf）として定義されている場合があります。
+ここでは無害なプロトタイプ定義を用意して、
+そのようなツールチェーンで発生する暗黙の宣言（implicit declaration）
+による警告を回避します。
+*/
+#ifndef HAVE_SNPRINTF_PROTO
+#include <stdarg.h>
+int snprintf(char *str, size_t size, const char *format, ...);
+#define HAVE_SNPRINTF_PROTO
+#endif
+
 static void generate_uuid(char* uuid_str)
 {
 	static unsigned int seed = 1;
@@ -583,7 +598,7 @@ static int generate_main_m_ios(const char* projname, const char* outdir)
 }
 
 /* Info.plist ファイルを生成 */
-static int generate_info_plist_macos(const char* projname, const char* outdir)
+static int generate_info_plist_macos(const char* projname, const char* outdir, const char* platform)
 {
 	const char* plist_content =
 		"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n"
@@ -599,7 +614,7 @@ static int generate_info_plist_macos(const char* projname, const char* outdir)
 		"    <key>CFBundleShortVersionString</key>\r\n"
 		"    <string>1.0</string>\r\n"
 		"    <key>CFBundleExecutable</key>\r\n"
-		"    <string>${PROJECT_NAME}</string>\r\n"
+		"    <string>PROJNAME</string>\r\n"
 		"    <key>CFBundlePackageType</key>\r\n"
 		"    <string>APPL</string>\r\n"
 		"    <key>CFBundleInfoDictionaryVersion</key>\r\n"
@@ -608,12 +623,22 @@ static int generate_info_plist_macos(const char* projname, const char* outdir)
 		"    <string>10.14</string>\r\n"
 		"    <key>NSHumanReadableCopyright</key>\r\n"
 		"    <string>Copyright (c) 2024. All rights reserved.</string>\r\n"
+		"    <key>NSPrincipalClass</key>\r\n"
+		"    <string>NSApplication</string>\r\n"
 		"</dict>\r\n"
 		"</plist>\r\n";
 
 	char path[1024];
 	char* plist_replaced = replace_all(plist_content, "PROJNAME", projname);
 	if (!plist_replaced) return 0;
+
+	/* プラットフォーム固有の上書き：iOS アプリでは主クラスに UIApplication を使用します */
+	if (platform && strcmp(platform, "ios") == 0) {
+		char *tmp = replace_all(plist_replaced,
+			"<key>NSPrincipalClass</key>\r\n    <string>NSApplication</string>",
+			"<key>NSPrincipalClass</key>\r\n    <string>UIApplication</string>");
+		if (tmp) { free(plist_replaced); plist_replaced = tmp; }
+	}
 
 	if (outdir && outdir[0] != '\0')
 		snprintf(path, sizeof(path), "%s/Info.plist", outdir);
@@ -649,19 +674,19 @@ static int generate_winobjc_main_m(const char* projname, const char* outdir)
 		"\r\n"
 		"@implementation AppDelegate\r\n"
 		"- (void)applicationWillFinishLaunching {\r\n"
-		"    NSLog(@\"[AppDelegate] \\u30a2\\u30d7\\u30ea\\u30b1\\u30fc\\u30b7\\u30e7\\u30f3\\u306e\\u8d77\\u52d5\\u6e96\\u5099\\u4e2d\");\r\n"
+		"    NSLog(@\"[AppDelegate] アプリケーションの起動準備中\");\r\n"
 		"}\r\n"
 		"- (void)applicationDidFinishLaunching {\r\n"
-		"    NSLog(@\"[AppDelegate] \\u30a2\\u30d7\\u30ea\\u30b1\\u30fc\\u30b7\\u30e7\\u30f3\\u306e\\u8d77\\u52d5\\u304c\\u5b8c\\u4e86\\u3057\\u307e\\u3057\\u305f\");\r\n"
+		"    NSLog(@\"[AppDelegate] アプリケーションの起動が完了しました\");\r\n"
 		"}\r\n"
 		"- (void)applicationDidBecomeActive {\r\n"
-		"    NSLog(@\"[AppDelegate] \\u30a2\\u30af\\u30c6\\u30a3\\u30d6\\u306b\\u306a\\u308a\\u307e\\u3057\\u305f\");\r\n"
+		"    NSLog(@\"[AppDelegate] アクティブになりました\");\r\n"
 		"}\r\n"
 		"- (void)applicationWillResignActive {\r\n"
-		"    NSLog(@\"[AppDelegate] \\u975e\\u30a2\\u30af\\u30c6\\u30a3\\u30d6\\u306b\\u306a\\u308a\\u307e\\u3057\\u305f\");\r\n"
+		"    NSLog(@\"[AppDelegate] 非アクティブになりました\");\r\n"
 		"}\r\n"
 		"- (void)applicationWillTerminate {\r\n"
-		"    NSLog(@\"[AppDelegate] \\u30a2\\u30d7\\u30ea\\u30b1\\u30fc\\u30b7\\u30e7\\u30f3\\u3092\\u7d42\\u4e86\\u3057\\u307e\\u3059\");\r\n"
+		"    NSLog(@\"[AppDelegate] アプリケーションを終了します\");\r\n"
 		"}\r\n"
 		"@end\r\n"
 		"\r\n"
@@ -680,8 +705,8 @@ static int generate_winobjc_main_m(const char* projname, const char* outdir)
 		"    EndPaint(self.hWnd, &ps);\r\n"
 		"}\r\n"
 		"- (void)handleMouseDownAt:(POINT)pt {\r\n"
-		"    NSLog(@\"[MyView] \\u30de\\u30a6\\u30b9\\u304c\\u30af\\u30ea\\u30c3\\u30af\\u3055\\u308c\\u307e\\u3057\\u305f: x=%ld, y=%ld\", pt.x, pt.y);\r\n"
-		"    // \\u5fc5\\u8981\\u306a\\u3089\\u3053\\u3053\\u3067\\u518d\\u63cf\\u753b\\u3084\\u4ed6\\u306e\\u51e6\\u7406\r\n"
+		"    NSLog(@\"[MyView] マウスがクリックされました: x=%ld, y=%ld\", pt.x, pt.y);\r\n"
+		"    // 必要ならここで再描画や他の処理\r\n"
 		"}\r\n"
 		"@end\r\n"
 		"\r\n"
@@ -696,7 +721,7 @@ static int generate_winobjc_main_m(const char* projname, const char* outdir)
 		"- (void)loadViewWithParent:(HWND)parent {\r\n"
 		"    self.view = [[MyView alloc] init];\r\n"
 		"    self.view.hWnd = parent;\r\n"
-		"    NSLog(@\"[MyViewController] \\u30d3\\u30e5\\u30fc\\u304c\\u89aa\\u30a6\\u30a3\\u30f3\\u30c9\\u30a6\\u306b\\u30a2\\u30bf\\u30c3\\u30c1\\u3055\\u308c\\u307e\\u3057\\u305f\");\r\n"
+		"    NSLog(@\"[MyViewController] ビューが親ウィンドウにアタッチされました\");\r\n"
 		"}\r\n"
 		"- (void)handleMouseDownAt:(POINT)pt {\r\n"
 		"    if (self.view) {\r\n"
@@ -705,13 +730,13 @@ static int generate_winobjc_main_m(const char* projname, const char* outdir)
 		"}\r\n"
 		"@end\r\n"
 		"\r\n"
-		"// \\u30b0\\u30ed\\u30fc\\u30d0\\u30eb\\u5909\\u6570\r\n"
+		"// グローバル変数\r\n"
 		"HINSTANCE hInst;\r\n"
 		"WCHAR szWindowClass[] = L\"ObjCWin32WindowClass\";\r\n"
 		"AppDelegate *appDelegate;\r\n"
 		"MyViewController *viewController;\r\n"
 		"\r\n"
-		"// \\u30d7\\u30ed\\u30c8\\u30bf\\u30a4\\u30d7\\u5ba3\\u8a00\r\n"
+		"// プロトタイプ宣言\r\n"
 		"ATOM                MyRegisterClass(HINSTANCE hInstance);\r\n"
 		"BOOL                InitInstance(HINSTANCE, int);\r\n"
 		"LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);\r\n"
@@ -760,7 +785,7 @@ static int generate_winobjc_main_m(const char* projname, const char* outdir)
 		"    return (int) msg.wParam;\r\n"
 		"}\r\n"
 		"\r\n"
-		"// \\u30a6\\u30a3\\u30f3\\u30c9\\u30a6\\u30af\\u30e9\\u30b9\\u767b\\u9332\r\n"
+		"// ウィンドウクラス登録\r\n"
 		"ATOM MyRegisterClass(HINSTANCE hInstance)\r\n"
 		"{\r\n"
 		"    WNDCLASSEXW wcex;\r\n"
@@ -770,16 +795,16 @@ static int generate_winobjc_main_m(const char* projname, const char* outdir)
 		"    wcex.cbClsExtra     = 0;\r\n"
 		"    wcex.cbWndExtra     = 0;\r\n"
 		"    wcex.hInstance      = hInstance;\r\n"
-		"    wcex.hIcon          = LoadIcon(0, IDI_APPLICATION); // \\u30c7\\u30d5\\u30a9\\u30eb\\u30c8\\u30a2\\u30a4\\u30b3\\u30f3\r\n"
+		"    wcex.hIcon          = LoadIcon(0, IDI_APPLICATION); // デフォルトアイコン\r\n"
 		"    wcex.hCursor        = LoadCursor(0, IDC_ARROW);\r\n"
 		"    wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);\r\n"
-		"    wcex.lpszMenuName   = 0; // \\u30e1\\u30cb\\u30e5\\u30fc\\u306a\\u3057\r\n"
+		"    wcex.lpszMenuName   = 0; // メニューなし\r\n"
 		"    wcex.lpszClassName  = szWindowClass;\r\n"
-		"    wcex.hIconSm        = LoadIcon(0, IDI_APPLICATION); // \\u30c7\\u30d5\\u30a9\\u30eb\\u30c8\\u30a2\\u30a4\\u30b3\\u30f3\r\n"
+		"    wcex.hIconSm        = LoadIcon(0, IDI_APPLICATION); // デフォルトアイコン\r\n"
 		"    return RegisterClassExW(&wcex);\r\n"
 		"}\r\n"
 		"\r\n"
-		"// \\u30a6\\u30a3\\u30f3\\u30c9\\u30a6\\u751f\\u6210\r\n"
+		"// ウィンドウ生成\r\n"
 		"BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)\r\n"
 		"{\r\n"
 		"   hInst = hInstance;\r\n"
@@ -789,13 +814,13 @@ static int generate_winobjc_main_m(const char* projname, const char* outdir)
 		"   if (!hWnd) return FALSE;\r\n"
 		"   ShowWindow(hWnd, nCmdShow);\r\n"
 		"   UpdateWindow(hWnd);\r\n"
-		"   // ViewController\\u751f\\u6210\\u30fbView\\u30ed\\u30fc\\u30c9\r\n"
+		"   // ViewController生成・Viewロード\r\n"
 		"   viewController = [[MyViewController alloc] init];\r\n"
 		"   [viewController loadViewWithParent:hWnd];\r\n"
 		"   return TRUE;\r\n"
 		"}\r\n"
 		"\r\n"
-		"// \\u30a6\\u30a3\\u30f3\\u30c9\\u30a6\\u30d7\\u30ed\\u30b7\\u30fc\\u30b8\\u30e3\r\n"
+		"// ウィンドウプロシージャ\r\n"
 		"LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)\r\n"
 		"{\r\n"
 		"    switch (message)\r\n"
@@ -1226,10 +1251,16 @@ static int generate_xcode_project(const char* projname, const char* outdir, cons
 		build_settings_debug = "SDKROOT = iphoneos; TARGETED_DEVICE_FAMILY = \"1,2\"; IPHONEOS_DEPLOYMENT_TARGET = 14.0; SUPPORTS_MACCATALYST = NO;";
 		build_settings_release = "SDKROOT = iphoneos; TARGETED_DEVICE_FAMILY = \"1,2\"; IPHONEOS_DEPLOYMENT_TARGET = 14.0; SUPPORTS_MACCATALYST = NO;";
 		framework_ref = "        20 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };\n"
-			"        21 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };\n";
-		framework_build = "        22 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 20; };\n"
-			"        23 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 21; };\n";
-		framework_link = "                22,\n                23,\n";
+			"        21 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };\n"
+			"        22 /* OpenGLES.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGLES.framework; path = System/Library/Frameworks/OpenGLES.framework; sourceTree = SDKROOT; };\n"
+			"        23 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };\n"
+			"        24 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };\n";
+		framework_build = "        25 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 20; };\n"
+			"        26 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 21; };\n"
+			"        27 /* OpenGLES.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 22; };\n"
+			"        28 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 23; };\n"
+			"        29 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 24; };\n";
+		framework_link = "                25,\n                26,\n                27,\n                28,\n                29,\n";
 	}
 	else
 	{
@@ -1852,7 +1883,7 @@ static int generate_vcxproj(const char* projname, const char* outdir, int gen_sr
 	char* template_con = (char*)malloc(strlen(template_base) + 1);
 	if (!template_con)
 	{
-		fprintf(stderr, "エラー: コンソールアプリテンプレートのメモリ割り当てに失敗しました\n");
+        fprintf(stderr, "エラー: コンソールアプリテンプレートのメモリ割り当てに失敗しました\n");
 		free(template_base);
 		return 0;
 	}
@@ -2278,8 +2309,8 @@ int main(int argc, char** argv)
 			if (!generate_main_m_macos(proj, xcode_proj_dir)) fprintf(stderr, "警告: macOS main.m の生成に失敗しました\n");
 		}
 
-		/* Info.plist を生成 (xcode_proj_dir に出力) */
-		if (!generate_info_plist_macos(proj, xcode_proj_dir)) fprintf(stderr, "警告: Info.plist の生成に失敗しました\n");
+	/* Info.plist を生成 (xcode_proj_dir に出力) */
+	if (!generate_info_plist_macos(proj, xcode_proj_dir, platform)) fprintf(stderr, "警告: Info.plist の生成に失敗しました\n");
 
 		/* Xcode プロジェクトを生成 (xcode_proj_dir に出力) */
 		if (!generate_xcode_project(proj, xcode_proj_dir, platform)) fprintf(stderr, "警告: Xcode プロジェクトの生成に失敗しました\n");
@@ -2313,8 +2344,8 @@ int main(int argc, char** argv)
 		}
 
 		/* iOS プロジェクトを生成（プロジェクト名に ios_ プレフィックス） */
-		if (!generate_main_m_ios(ios_proj_name, ios_proj_dir)) fprintf(stderr, "警告: iOS main.m の生成に失敗しました\n");
-		if (!generate_info_plist_macos(ios_proj_name, ios_proj_dir)) fprintf(stderr, "警告: iOS Info.plist の生成に失敗しました\n");
+	if (!generate_main_m_ios(ios_proj_name, ios_proj_dir)) fprintf(stderr, "警告: iOS main.m の生成に失敗しました\n");
+	if (!generate_info_plist_macos(ios_proj_name, ios_proj_dir, "ios")) fprintf(stderr, "警告: iOS Info.plist の生成に失敗しました\n");
 		if (!generate_xcode_project(ios_proj_name, ios_proj_dir, "ios")) fprintf(stderr, "警告: iOS Xcode プロジェクトの生成に失敗しました\n");
 
 		/* macOS プロジェクトディレクトリ作成 */
@@ -2324,8 +2355,8 @@ int main(int argc, char** argv)
 		}
 
 		/* macOS プロジェクトを生成（プロジェクト名に macos_ プレフィックス） */
-		if (!generate_main_m_macos(macos_proj_name, macos_proj_dir)) fprintf(stderr, "警告: macOS main.m の生成に失敗しました\n");
-		if (!generate_info_plist_macos(macos_proj_name, macos_proj_dir)) fprintf(stderr, "警告: macOS Info.plist の生成に失敗しました\n");
+	if (!generate_main_m_macos(macos_proj_name, macos_proj_dir)) fprintf(stderr, "警告: macOS main.m の生成に失敗しました\n");
+	if (!generate_info_plist_macos(macos_proj_name, macos_proj_dir, "macos")) fprintf(stderr, "警告: macOS Info.plist の生成に失敗しました\n");
 		if (!generate_xcode_project(macos_proj_name, macos_proj_dir, "macos")) fprintf(stderr, "警告: macOS Xcode プロジェクトの生成に失敗しました\n");
 
 		/* Parent Xcode プロジェクトを生成 */
